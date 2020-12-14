@@ -1,0 +1,112 @@
+version: '3.3'
+
+services:
+
+    postgresql-gogs:
+        image: postgres:9.5
+        container_name: postgresql-gogs
+        restart: always
+        environment:
+            - POSTGRES_USER=gogs
+            - POSTGRES_PASSWORD=gogs
+            - POSTGRES_DB=gogs
+        volumes:
+            - "postgresql-gogs-data:/var/lib/postgresql/data"
+        networks:
+            - ci
+
+    gogs:
+        image: gogs/gogs:latest
+        container_name: gogs
+        restart: always
+        ports:
+            - "10022:22"
+            - "3000:3000"
+        links:
+            - postgresql-gogs
+        environment:
+            - "RUN_CROND=true"
+        networks:
+            - ci
+        volumes:
+            - "gogs-data:/data"
+        depends_on:
+            - postgresql-gogs
+
+    jenkins:
+        image: jenkins/jenkins:lts
+        container_name: jenkins
+        restart: always
+        privileged: true
+        user: root
+        ports:
+            - "8081:8080"
+            - "50000:50000"
+        expose:
+            - 8080
+        networks:
+            - ci
+        volumes:
+            - "jenkins-data:/data"
+
+    postgresql-sonar:
+        image: postgres:9.5
+        container_name: postgresql-sonar
+        restart: always
+        networks:
+            - ci
+        environment:
+            - POSTGRES_USER=sonar
+            - POSTGRES_PASSWORD=sonar
+        volumes:
+            - postgresql-sonar:/var/lib/postgresql
+            - postgresql-data-sonar:/var/lib/postgresql/data
+
+    sonarqube:
+        image: sonarqube
+        container_name: sonarqube
+        restart: always
+        expose:
+            - 9000
+        ports:
+            - "9001:9000"
+        networks:
+            - ci
+        depends_on:
+            - postgresql-sonar
+        privileged: true
+        user: root
+        command: -Dsonar.ce.javaOpts=-Xmx1192m -Dsonar.web.javaOpts=-Xmx1192m
+        environment:
+            - SONARQUBE_JDBC_URL=jdbc:postgresql://postgresql-sonar:5432/sonar
+            - SONARQUBE_JDBC_USERNAME=sonar
+            - SONARQUBE_JDBC_PASSWORD=sonar
+        volumes:
+            - sonarqube_conf:/opt/sonarqube/conf
+            - sonarqube_data:/opt/sonarqube/data
+            - sonarqube_extensions:/opt/sonarqube/extensions
+            - sonarqube_bundled-plugins:/opt/sonarqube/lib/bundled-plugins
+  
+networks:
+    ci:
+        driver: bridge
+
+volumes:
+    postgresql-gogs-data:
+        driver: local
+    gogs-data:
+        driver: local
+    jenkins-data:
+        driver: local
+    postgresql-sonar:
+        driver: local
+    postgresql-data-sonar:
+        driver: local
+    sonarqube_conf:
+        driver: local
+    sonarqube_data:
+        driver: local
+    sonarqube_extensions:
+        driver: local
+    sonarqube_bundled-plugins:
+        driver: local
